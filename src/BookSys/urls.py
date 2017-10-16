@@ -14,6 +14,7 @@ Including another URLconf
 """
 from django.conf.urls import url
 # from django.contrib import admin
+#
 from django.views import static
 from Book import views
 
