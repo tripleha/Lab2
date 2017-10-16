@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style type="text/css">
+        div#bg_div{position: fixed;top: 0;left: 0;bottom: 0;right: 0;z-index: -1}
+        div#bg_div>img{height: 100%;width: 100%;border: 0}
+        div#wall{position: fixed;top: 0;left: 0;bottom: 0;right: 0;z-index: 100;
+            opacity: 0.5;display: none;background-color: black}
+        div#main_panel{margin:0 auto;width: 80%;height: 100%;z-index: 1;
+            top: 0;left: 0;bottom: 0;right: 0;position: fixed}
+        div#add_book_div,#add_author_div,#query_div,#detail_div,#differ_author_div{top: 0;left: 0;bottom: 0;right: 0;
+            opacity: 0.8;display: none;overflow: auto;margin: auto;position: fixed}
+        div#add_book_div{z-index: 101;width: 40%;height: 50%;background-color: white}
+        div#add_author_div{z-index: 202;width: 40%;height: 40%;background-color: white}
+        div#query_div{z-index: 103;width: 40%;height: 32%;background-color: white}
+        div#detail_div{z-index: 104;width: 50%;height: 85%;background-color: white}
+        div#differ_author_div{z-index: 105;width: 40%;height: 25%;background-color: white}
+        table#book_table{display: none}
+        th.th_a{width: 15%;text-align: center}
+        th.th_b{width: 35%;text-align: center}
+        th.th_c{width: 30%;text-align: center}
+        th.th_d{width: 20%;text-align: center}
+        td.td_a{width: 15%;text-align: center}
+        td.td_b{width: 35%;text-align: center}
+        td.td_c{width: 30%;text-align: center}
+        td.td_d{width: 20%;text-align: center}
+    </style>
+    <title>图书管理</title>
+    <link href="http://cdn.bootcss.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet">
+    <script src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="http://cdn.bootcss.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+    <script>
+        function show_table(books){
+            var book_table=$('#book_table');
+            book_table.hide();
+            book_table.find('tbody').html('');
+            page = Number($('#page_now').text());
+            for (var i=0;i<books.length;i++){
+                var new_line='<tr>'+
+                "<td class='td_a'>"+((page-1)*30+i+1).toString()+"</td>"+
+                "<td class='td_b'>"+ books[i].title +"</td>"+
+                "<td class='td_c'>"+ books[i].author_id +"</td>"+
+                "<td class='td_d'>"+
+                '<button onclick="'+"show_detail('"+ books[i].isbn +"')"+'" class="btn btn-primary">详情</button>'+
+                '<button onclick="'+"delete_book('"+ books[i].isbn +"')"+'" class="btn btn-danger">删除</button>'+
+                "</td></tr>";
+                book_table.find('tbody').append(new_line);
+            }
+            book_table.show();
+        };
+        function show_by_page(page){
+            $.post({% url 'query_book_by_page' %},{
+                page:page
+            },function(result){
+                if (result.retcode==0){
+                    var page_num = Math.ceil(result.book_count/30);
+                    $('#total_page_lab').text('总页数:'+page_num.toString());
+                    $('#page_now').text(page);
+                    $('#q_type').val("0");
+                    $('#book_count').val(result.book_count);
+                    show_table(result.books);
+                }
+                else if(result.retcode==10003){
+                    if (result.errkey=="page"){
+                        $('#info').text('页码错误！');
+                        $('#show_info').trigger('click');
+                    }
+                }
+                else if(result.retcode==10010){
+                    $('#info').text('未知错误！');
+                    $('#show_info').trigger('click');
+                }
+            });
+        };
+        function show_by_author(page, author_id, author_name){
+            $.post({% url 'query_by_author_id_or_name' %},{
+                page:page,
+                author_id:author_id,
+                name:author_name
+            },function(result){
+                if (result.retcode==0){
+                    var page_num = Math.ceil(result.book_count/30);
+                    $('#total_page_lab').text('总页数:'+page_num.toString());
+                    $('#page_now').text(page);
+                    $('#q_author_id').val(author_id);
+                    $('#q_author_name').val(author_name);
+                    $('#q_type').val("1");
+                    $('#book_count').val(result.book_count);
+                    show_table(result.books);
+                    $('#close_query').trigger('click');
+                }
+                else if(result.retcode==10003){
+                    if (result.errkey=="author_id"){
+                        $('#info').text('作者ID格式错误！');
+                        $('#show_info').trigger('click');
+                    }
+                    else if(result.errkey=="name"){
+                        $('#info').text('作者名格式错误！');
+                        $('#show_info').trigger('click');
+                    }
+                    else if(result.errkey=="page"){
+                        $('#info').text('页码错误！');
+                        $('#show_info').trigger('click');
+                    }
+                }
+                else if(result.retcode==10001){
+                    $('#info').text('无匹配作者！');
+                    $('#show_info').trigger('click');
+                }
+                else if(result.retcode==10010){
+                    $('#info').text('未知错误！');
+                    $('#show_info').trigger('click');
+                }
+            });
+        };
+        function show_detail(isbn){
+            $.post({% url 'get_book_detail' %},{
+                isbn:isbn
+            },function(result){
+                if (result.retcode==0){
+                    $('#p_isbn').text(result.book.isbn);
+                    $('#p_title').text(result.book.title);
+                    $('#p_publisher').text(result.book.publisher);
+                    $('#p_publish_date').text(result.book.publish_date);
+                    $('#p_price').text(result.book.price);
+                    $('#p_author_id').text(result.author.author_id);
+                    $('#p_author_name').text(result.author.name);
+                    $('#p_age').text(result.author.age);
+                    $('#p_country').text(result.author.country);
+                    $('#wall').fadeIn('fast');
+                    $('#detail_div').fadeIn('fast');
+                }
+                else if(result.retcode==10003){
+                    if (result.errkey=="isbn"){
+                        $('#info').text('ISBN格式错误！');
+                        $('#show_info').trigger('click');
+                    }
+                }
+                else if(result.retcode==10001){
+                    $('#info').text('图书不存在！');
+                    $('#show_info').trigger('click');
+                }
+                else if(result.retcode==10010){
+                    $('#info').text('未知错误！');
+                    $('#show_info').trigger('click');
+                }
+            });
+        };
+        function delete_book(isbn){
+            $.post({% url 'delete_book' %},{
+                isbn:isbn
+            },function(result){
+                if (result.retcode==0){
+                    $('#show_table_btn').trigger('click');
+                }
+                else if(result.retcode==10003){
+                    if (result.errkey=="isbn"){
+                        $('#info').text('ISBN格式错误！');
+                        $('#show_info').trigger('click');
+                    }
+                }
+                else if(result.retcode==10001){
+                    $('#info').text('图书不存在！');
+                    $('#show_info').trigger('click');
+                }
+                else if(result.retcode==10010){
+                    $('#info').text('未知错误！');
+                    $('#show_info').trigger('click');
+                }
+            });
+        };
+    </script>
+    <script>
+        window.onload=function(){
+            $.ajaxSetup({
+                data:{csrfmiddlewaretoken:'{{ csrf_token }}'}
+            });
+            show_by_page(1);
+        };
+        $(document).ready(function(){
+            $('#show_table_btn').click(function(){
+                var type=$('#q_type').val();
+                var page=$('#page_now').text();
+                if (type=="0"){
+                    show_by_page(page);
+                }
+                else{
+                    var author_id=$('#q_author_id').val();
+                    var author_name=$('#q_author_name').val();
+                    show_by_author(page, author_id, author_name);
+                }
+            });
+            $('#query_all_btn').click(function(){
+                show_by_page(1);
+            });
+            $('#add_btn').click(function(){
+                if ($('#do_add_book').text()=="修改"){
+                    $('#re_add_book').removeAttr('disabled');
+                    $('#add_book_reset').trigger('click');
+                }
+                $('#isbn').attr('readonly',false);
+                $('#title').attr('readonly',false);
+                $('#author_id').attr('readonly',false);
+                $('#add_book_title').text("添加图书");
+                $('#do_add_book').text("添加");
+                $('#wall').fadeIn('fast');
+                $('#add_book_div').fadeIn('fast');
+            });
+            $('#do_add_book').click(function(){
+                if ($('#do_add_book').text()=="添加"){
+                    $.post({% url 'add_book' %},{
+                        isbn:$('#isbn').val(),
+                        title:$('#title').val(),
+                        author_id:$('#author_id').val(),
+                        publisher:$('#publisher').val(),
+                        publish_date:$('#publish_date').val(),
+                        price:$('#price').val()
+                    },function(result){
+                        if (result.retcode==0){
+                            $('#close_add_book').trigger('click');
+                            $('#show_table_btn').trigger('click');
+                            $('#add_book_reset').trigger('click');
+                        }
+                        else if(result.retcode==10002){
+                            if ($('#do_add_author').text()=="修改"){
+                                $('#re_add_author').removeAttr('disabled');
+                                $('#add_author_reset').trigger('click');
+                            }
+                            $('#add_author_id').attr('readonly',false);
+                            $('#add_author_title').text("添加作者");
+                            $('#do_add_author').text("添加");
+                            $('#add_author_id').val($('#author_id').val());
+                            $('#div_back').val("add_book_div");
+                            $('#add_book_div').fadeOut('fast');
+                            $('#add_author_div').fadeIn('fast');
+                            $('#info').text('作者不存在，请添加作者！');
+                            $('#show_info').trigger('click');
+                        }
+                        else if(result.retcode==10003){
+                            if (result.errkey=="isbn"){
+                                $('#info').text('ISBN格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="title"){
+                                $('#info').text('书名格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="author_id"){
+                                $('#info').text('作者ID格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="publisher"){
+                                $('#info').text('出版社格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="publish_date"){
+                                $('#info').text('出版日期格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="price"){
+                                $('#info').text('价格格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                        }
+                        else if(result.retcode==10001){
+                            $('#info').text('图书已存在！');
+                            $('#show_info').trigger('click');
+                        }
+                        else if(result.retcode==10010){
+                            $('#info').text('未知错误！');
+                            $('#show_info').trigger('click');
+                        }
+                    });
+                }
+                else{
+                    $.post({% url 'change_book_info' %},{
+                        isbn:$('#isbn').val(),
+                        title:$('#title').val(),
+                        author_id:$('#author_id').val(),
+                        publisher:$('#publisher').val(),
+                        publish_date:$('#publish_date').val(),
+                        price:$('#price').val()
+                    },function(result){
+                        if (result.retcode==0){
+                            var isbn=$('#p_isbn').text();
+                            $('#div_back').val("");
+                            $('#close_add_book').trigger('click');
+                            $('#add_book_reset').trigger('click');
+                            show_detail(isbn);
+                        }
+                        else if(result.retcode==10003){
+                            if (result.errkey=="isbn"){
+                                $('#info').text('ISBN格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="title"){
+                                $('#info').text('书名格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="author_id"){
+                                $('#info').text('作者ID格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="publisher"){
+                                $('#info').text('出版社格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="publish_date"){
+                                $('#info').text('出版日期格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="price"){
+                                $('#info').text('价格格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                        }
+                        else if(result.retcode==10001){
+                            $('#info').text('图书不存在！');
+                            $('#show_info').trigger('click');
+                        }
+                        else if(result.retcode==10010){
+                            $('#info').text('未知错误！');
+                            $('#show_info').trigger('click');
+                        }
+                    });
+                }
+            });
+            $('#re_add_book').click(function(){
+                $('#add_book_reset').trigger('click');
+            });
+            $('#close_add_book').click(function(){
+                $('#add_book_div').fadeOut('fast');
+                if ($('#div_back').val()==""){
+                    $('#wall').fadeOut('fast');
+                }
+                else{
+                   $('#'+$('#div_back').val()).fadeIn('fast');
+                   $('#div_back').val("");
+                }
+            });
+            $('#query_by_author_btn').click(function(){
+                $('#wall').fadeIn('fast');
+                $('#query_div').fadeIn('fast');
+            });
+            $('#do_query_author').click(function(){
+                var author_id=$('#query_author_id').val();
+                var author_name=$('#query_author_name').val();
+                if (author_id==""){
+                    show_by_author(page, "-1", author_name)
+                }
+                else{
+                    show_by_author(page, author_id, author_name)
+                }
+            });
+            $('#re_query_author').click(function(){
+                $('#query_author_reset').trigger('click');
+            });
+            $('#close_query').click(function(){
+                $('#query_div').fadeOut('fast');
+                $('#wall').fadeOut('fast');
+            });
+            $('#close_detail').click(function(){
+                $('#detail_div').fadeOut('fast');
+                $('#wall').fadeOut('fast');
+                $('#div_back').val("");
+            });
+            $('#do_add_author').click(function(){
+                if ($('#do_add_author').text()=="添加"){
+                    $.post({% url 'add_author' %},{
+                        author_id:$('#add_author_id').val(),
+                        name:$(author_name).val(),
+                        age:$('#age').val(),
+                        country:$('#country').val()
+                    },function(result){
+                        if (result.retcode==0){
+                            $('#close_add_author').trigger('click');
+                            $('#add_author_reset').trigger('click');
+                        }
+                        else if(result.retcode==10003){
+                            if (result.errkey=="author_id"){
+                                $('#info').text('作者ID格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="name"){
+                                $('#info').text('作者名格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="age"){
+                                $('#info').text('年龄格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="country"){
+                                $('#info').text('国籍格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                        }
+                        else if(result.retcode==10001){
+                            $('#info').text('作者已存在！');
+                            $('#show_info').trigger('click');
+                        }
+                        else if(result.retcode==10010){
+                            $('#info').text('未知错误！');
+                            $('#show_info').trigger('click');
+                        }
+                    });
+                }
+                else{
+                    $.post({% url 'change_author_info' %},{
+                        author_id:$('#add_author_id').val(),
+                        name:$(author_name).val(),
+                        age:$('#age').val(),
+                        country:$('#country').val()
+                    },function(result){
+                        if (result.retcode==0){
+                            var isbn=$('#p_isbn').text();
+                            $('#div_back').val("");
+                            $('#q_type').val("0");
+                            $('#close_add_author').trigger('click');
+                            $('#add_author_reset').trigger('click');
+                            show_detail(isbn);
+                        }
+                        else if(result.retcode==10003){
+                            if (result.errkey=="author_id"){
+                                $('#info').text('作者ID格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="name"){
+                                $('#info').text('作者名格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="age"){
+                                $('#info').text('年龄格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                            else if (result.errkey=="country"){
+                                $('#info').text('国籍格式错误！');
+                                $('#show_info').trigger('click');
+                            }
+                        }
+                        else if(result.retcode==10001){
+                            $('#info').text('作者不存在！');
+                            $('#show_info').trigger('click');
+                        }
+                        else if(result.retcode==10010){
+                            $('#info').text('未知错误！');
+                            $('#show_info').trigger('click');
+                        }
+                    });
+                }
+            });
+            $('#re_add_author').click(function(){
+                $('#add_author_reset').trigger('click');
+            });
+            $('#close_add_author').click(function(){
+                $('#add_author_div').fadeOut('fast');
+                if ($('#div_back').val()==""){
+                    $('#wall').fadeOut('fast');
+                }
+                else{
+                   $('#'+$('#div_back').val()).fadeIn('fast');
+                   $('#div_back').val("");
+                }
+            });
+            $('#change_book_info_btn').click(function(){
+                $('#isbn').val($('#p_isbn').text());
+                $('#title').val($('#p_title').text());
+                $('#author_id').val($('#p_author_id').text());
+                $('#publisher').val($('#p_publisher').text());
+                $('#publish_date').val($('#p_publish_date').text());
+                $('#price').val($('#p_price').text());
+                $('#isbn').attr('readonly',true);
+                $('#title').attr('readonly',true);
+                $('#author_id').attr('readonly',true);
+                $('#add_book_title').text("修改图书信息");
+                $('#do_add_book').text("修改");
+                $('#re_add_book').attr('disabled',true);
+                $('#div_back').val("detail_div");
+                $('#detail_div').fadeOut('fast');
+                $('#add_book_div').fadeIn('fast');
+            });
+            $('#change_author_info_btn').click(function(){
+                $('#add_author_id').val($('#p_author_id').text());
+                $('#author_name').val($('#p_author_name').text());
+                $('#age').val($('#p_age').text());
+                $('#country').val($('#p_country').text());
+                $('#add_author_id').attr('readonly',true);
+                $('#add_author_title').text("修改作者信息");
+                $('#do_add_author').text("修改");
+                $('#re_add_author').attr('disabled',true);
+                $('#div_back').val("detail_div");
+                $('#detail_div').fadeOut('fast');
+                $('#add_author_div').fadeIn('fast');
+            });
+            $('#differ_author_btn').click(function(){
+                $('#differ_author_id').val($('#p_author_id').text()),
+                $('#div_back').val("detail_div");
+                $('#detail_div').fadeOut('fast');
+                $('#differ_author_div').fadeIn('fast');
+            });
+            $('#re_differ_author').click(function(){
+                $('#differ_author_reset').trigger('click');
+            });
+            $('#close_differ').click(function(){
+                $('#differ_author_div').fadeOut('fast');
+                if ($('#div_back').val()==""){
+                    $('#wall').fadeOut('fast');
+                }
+                else{
+                   $('#detail_div').fadeIn('fast');
+                }
+            });
+            $('#do_differ_author').click(function(){
+                $.post({% url 'change_book_author' %},{
+                    isbn:$('#p_isbn').text(),
+                    author_id:$('#differ_author_id').val()
+                },function(result){
+                    if (result.retcode==0){
+                        var isbn=$('#p_isbn').text();
+                        $('#div_back').val("");
+                        $('#close_differ').trigger('click');
+                        $('#differ_author_reset').trigger('click');
+                        show_detail(isbn);
+                    }
+                    else if(result.retcode==10002){
+                        if ($('#do_add_author').text()=="修改"){
+                            $('#re_add_author').removeAttr('disabled');
+                            $('#add_author_reset').trigger('click');
+                        }
+                        $('#add_author_id').attr('readonly',false);
+                        $('#add_author_title').text("添加作者");
+                        $('#do_add_author').text("添加");
+                        $('#add_author_id').val($('#differ_author_id').val());
+                        $('#div_back').val("differ_author_div");
+                        $('#differ_author_div').fadeOut('fast');
+                        $('#add_author_div').fadeIn('fast');
+                        $('#info').text('作者不存在，请添加作者！');
+                        $('#show_info').trigger('click');
+                    }
+                    else if(result.retcode==10003){
+                        if (result.errkey=="author_id"){
+                            $('#info').text('作者ID格式错误！');
+                            $('#show_info').trigger('click');
+                        }
+                        else if (result.errkey=="isbn"){
+                            $('#info').text('ISBN格式错误！');
+                            $('#show_info').trigger('click');
+                        }
+                    }
+                    else if(result.retcode==10001){
+                        $('#info').text('图书不存在！');
+                        $('#show_info').trigger('click');
+                    }
+                    else if(result.retcode==10010){
+                        $('#info').text('未知错误！');
+                        $('#show_info').trigger('click');
+                    }
+                });
+            });
+            $('#pre_page_btn').click(function(){
+                var page=Number($('#page_now').text());
+                if (page>1){
+                    page=page-1;
+                    $('#page_now').text(page.toString());
+                    $('#show_table_btn').trigger('click');
+                }
+            });
+            $('#next_page_btn').click(function(){
+                var page=Number($('#page_now').text());
+                var book_count=Number($('#book_count').val());
+                if (page<Math.ceil(book_count/30)){
+                    page=page+1;
+                    $('#page_now').text(page.toString());
+                    $('#show_table_btn').trigger('click');
+                }
+            });
+            $('#change_page_btn').click(function(){
+                var page=Number($('#set_page_in').val());
+                var book_count=Number($('#book_count').val());
+                if (page<=Math.ceil(book_count/30) && page>=1){
+                    $('#page_now').text(page.toString());
+                    $('#show_table_btn').trigger('click');
+                    $('#set_page_in').val("");
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <div id="bg_div"><img src="http://chuantu.biz/t6/84/1507444299x3688494594.png"/></div>
+    <div id="wall"></div>
+    <div id="main_panel" class="panel panel-primary">
+        <div class="panel-heading" style="height: 6%">
+            <table class="table" rules="none">
+                <thead>
+                    <tr>
+                        <th class="th_a"><h4>序号</h4></th>
+                        <th class="th_b"><h4>书名</h4></th>
+                        <th class="th_c"><h4>作者ID</h4></th>
+                        <th class="th_d"><h4>操作</h4></th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+        <div class="panel-body" style="height: 88%;overflow: auto">
+            <table id="book_table" class="table table-bordered table-striped table-hover">
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="panel-footer" style="height: 6%">
+            <table class="table" rules="none">
+                <thead>
+                    <tr>
+                        <th style="text-align: center">
+                            <div class="btn-group">
+                                <button id="add_btn" class="btn btn-primary">添加图书</button>
+                                <button id="query_all_btn" class="btn btn-primary">全部图书</button>
+                                <button id="query_by_author_btn" class="btn btn-primary">按作者查询</button>
+                            </div>
+                        </th>
+                        <th style="text-align: center">
+                            <div class="form-inline">
+                                <button id="pre_page_btn" class="btn btn-primary">上一页</button>
+                                <label id="page_now" class="control-label">1</label>
+                                <button id="next_page_btn" class="btn btn-primary">下一页</button>
+                            </div>
+                        </th>
+                        <th style="text-align: center">
+                            <div class="form-inline">
+                                <label id="total_page_lab" for="set_page_in" class="control-label">总页数</label>
+                                <input id="set_page_in" type="text" class="form-control" maxlength="10"
+                                   placeholder="页数" style="width:60px">
+                                <button id="change_page_btn" class="btn btn-primary">跳转</button>
+                            </div>
+                        </th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+    <div id="add_book_div" class="panel panel-primary">
+        <div class="panel-heading" style="text-align: center">
+            <h1 id="add_book_title" style="margin:0 auto"></h1>
+        </div>
+        <div class="panel-body" style="text-align: center">
+            <form class="form-horizontal" role="form">
+                <div class="form-group">
+                    <label for="isbn" class="col-sm-5 control-label">ISBN</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="isbn" maxlength="13"
+                               placeholder="请输入ISBN">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="title" class="col-sm-5 control-label">书名</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="title" maxlength="50"
+                               placeholder="请输入书名">
+                    </div>
+                </div><br>
+                <div class="form-group">
+                    <label for="author_id" class="col-sm-5 control-label">作者ID</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="author_id" maxlength="20"
+                               placeholder="请输入作者ID">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="publisher" class="col-sm-5 control-label">出版社</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="publisher" maxlength="50"
+                               placeholder="请输入出版社">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="publish_date" class="col-sm-5 control-label">出版日期</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="publish_date" maxlength="10"
+                               placeholder="请输入出版日期">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="price" class="col-sm-5 control-label">价格</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="price" maxlength="50"
+                               placeholder="请输入价格">
+                    </div>
+                </div>
+                <button id="add_book_reset" type="reset" style="display: none"></button>
+            </form><br>
+            <div class="btn-group">
+                <button id="do_add_book" class="btn btn-default"></button>
+                <button id="re_add_book" class="btn btn-default">清除</button>
+                <button id="close_add_book" class="btn btn-default">取消</button>
+            </div>
+        </div>
+    </div>
+    <div id="add_author_div" class="panel panel-primary">
+        <div class="panel-heading" style="text-align: center">
+            <h1 id="add_author_title" style="margin:0 auto"></h1>
+        </div>
+        <div class="panel-body" style="text-align: center">
+            <form class="form-horizontal" role="form">
+                <div class="form-group">
+                    <label for="add_author_id" class="col-sm-5 control-label">作者ID</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="add_author_id" maxlength="20"
+                               placeholder="请输入作者ID">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="author_name" class="col-sm-5 control-label">作者名</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="author_name" maxlength="50"
+                               placeholder="请输入作者名">
+                    </div>
+                </div><br>
+                <div class="form-group">
+                    <label for="age" class="col-sm-5 control-label">年龄</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="age" maxlength="3"
+                               placeholder="请输入年龄">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="country" class="col-sm-5 control-label">国籍</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="country" maxlength="50"
+                               placeholder="请输入国籍">
+                    </div>
+                </div>
+                <button id="add_author_reset" type="reset" style="display: none"></button>
+            </form><br>
+            <div class="btn-group">
+                <button id="do_add_author" class="btn btn-default"></button>
+                <button id="re_add_author" class="btn btn-default">清除</button>
+                <button id="close_add_author" class="btn btn-default">取消</button>
+            </div>
+        </div>
+    </div>
+    <div id="query_div" class="panel panel-primary">
+        <div class="panel-heading" style="text-align: center">
+            <h1 style="margin:0 auto">按作者查询</h1>
+        </div>
+        <div class="panel-body" style="text-align: center">
+            <form class="form-horizontal" role="form">
+                <br>
+                <div class="form-group">
+                    <label for="query_author_id" class="col-sm-5 control-label">作者ID（可选）</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="query_author_id" maxlength="20"
+                               placeholder="请输入作者ID（可选）">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="query_author_name" class="col-sm-5 control-label">作者名</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="query_author_name" maxlength="50"
+                               placeholder="请输入作者名">
+                    </div>
+                </div><br>
+                <button id="query_author_reset" type="reset" style="display: none"></button>
+            </form><br>
+            <div class="btn-group">
+                <button id="do_query_author" class="btn btn-default">查询</button>
+                <button id="re_query_author" class="btn btn-default">清除</button>
+                <button id="close_query" class="btn btn-default">取消</button>
+            </div>
+        </div>
+    </div>
+    <div id="detail_div" class="panel panel-primary">
+        <div class="panel-heading" style="text-align: center">
+            <h1 style="margin:0 auto">图书详情</h1>
+        </div>
+        <div class="panel-body" style="text-align: center">
+            <br>
+            <ul class="list-group">
+                <li class="list-group-item">
+                    <h4 class="list-group-item-heading">图书信息</h4>
+                </li>
+                <li class="list-group-item">
+                    <h5 class="list-group-item-heading">ISBN</h5>
+                    <p id="p_isbn" class="list-group-item-text"></p>
+                </li>
+                <li class="list-group-item">
+                    <h5 class="list-group-item-heading">书名</h5>
+                    <p id="p_title" class="list-group-item-text"></p>
+                </li>
+                <li class="list-group-item">
+                    <h5 class="list-group-item-heading">出版社</h5>
+                    <p id="p_publisher" class="list-group-item-text"></p>
+                </li>
+                <li class="list-group-item">
+                    <h5 class="list-group-item-heading">出版日期</h5>
+                    <p id="p_publish_date" class="list-group-item-text"></p>
+                </li>
+                <li class="list-group-item">
+                    <h5 class="list-group-item-heading">价格</h5>
+                    <p id="p_price" class="list-group-item-text"></p>
+                </li>
+                <li class="list-group-item">
+                    <h4 class="list-group-item-heading">作者信息</h4>
+                </li>
+                <li class="list-group-item">
+                    <h5 class="list-group-item-heading">作者ID</h5>
+                    <p id="p_author_id" class="list-group-item-text"></p>
+                </li>
+                <li class="list-group-item">
+                    <h5 class="list-group-item-heading">作者名</h5>
+                    <p id="p_author_name" class="list-group-item-text"></p>
+                </li>
+                <li class="list-group-item">
+                    <h5 class="list-group-item-heading">年龄</h5>
+                    <p id="p_age" class="list-group-item-text"></p>
+                </li>
+                <li class="list-group-item">
+                    <h5 class="list-group-item-heading">国籍</h5>
+                    <p id="p_country" class="list-group-item-text"></p>
+                </li>
+            </ul><br>
+            <div class="btn-group">
+                <button id="change_book_info_btn" class="btn btn-default">修改图书信息</button>
+                <button id="change_author_info_btn" class="btn btn-default">修改作者信息</button>
+                <button id="differ_author_btn" class="btn btn-default">更换作者</button>
+                <button id="close_detail" class="btn btn-default">返回</button>
+            </div>
+        </div>
+    </div>
+    <div id="differ_author_div" class="panel panel-primary">
+        <div class="panel-heading" style="text-align: center">
+            <h1 style="margin:0 auto">更换作者</h1>
+        </div>
+        <div class="panel-body" style="text-align: center">
+            <form class="form-horizontal" role="form">
+                <br>
+                <div class="form-group">
+                    <label for="differ_author_id" class="col-sm-5 control-label">作者ID</label>
+                    <div class="col-sm-6">
+                        <input type="text" class="form-control" id="differ_author_id" maxlength="20"
+                               placeholder="请输入作者ID">
+                    </div>
+                </div>
+                <button id="differ_author_reset" type="reset" style="display: none"></button>
+            </form><br>
+            <div class="btn-group">
+                <button id="do_differ_author" class="btn btn-default">更换</button>
+                <button id="re_differ_author" class="btn btn-default">清除</button>
+                <button id="close_differ" class="btn btn-default">取消</button>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="modal_wall" tabindex="-10086" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content" style="text-align: center">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">
+                        &times;
+                    </button>
+                    <h4 class="modal-title">提示</h4>
+                </div>
+                <div class="modal-body">
+                    <h1 id="info"></h1>
+                </div>
+            </div>
+        </div>
+    </div>
+    <button data-toggle="modal" data-target="#modal_wall" id="show_info"
+            style="display: none"></button>
+    <input id="q_type" value="0" style="display: none">
+    <input id="q_author_id" value="" style="display: none">
+    <input id="q_author_name" value="" style="display: none">
+    <input id="book_count" value="" style="display: none">
+    <input id="div_back" value="" style="display: none">
+    <button id="show_table_btn" style="display: none" value="0"></button>
+</body>
+</html>
